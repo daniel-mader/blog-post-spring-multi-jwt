@@ -1,0 +1,22 @@
+logging:
+  level:
+    org.springframework.security: DEBUG
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://dev-308298.okta.com
+
+static-jwt:
+  hmacsecret: "PmH10yb2p8YPgKiNy4cnzBwSFpLnf6n1"
+  issuer: "https://static.token.generator.local"
+  valid-token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGF0aWNVc2VyIiwiaXNzIjoiaHR0cHM6Ly9zdGF0aWMudG9rZW4uZ2VuZXJhdG9yLmxvY2FsIiwiZXhwIjoxODk5MTk4Nzc4fQ.dh8nhRNUrzIiflhZcUROai412gUAK1v5JkbOYEzHPhg"
+  expired-token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGF0aWNVc2VyIiwiaXNzIjoiaHR0cHM6Ly9zdGF0aWMudG9rZW4uZ2VuZXJhdG9yLmxvY2FsIiwiZXhwIjoxNTgzODM4OTI5fQ.2PcSvaqJnaHd0IXwPv0ZDOm05DxDc_oYH3S9YYUFAtI"
+
+basicAuth: "YmFzaWNVc2VyOnBhc3N3b3Jk"
+
+keycloak-docker-image:
+  image: "quay.io/keycloak/keycloak"
+  version: "9.0.0"

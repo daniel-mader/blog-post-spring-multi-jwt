@@ -1,0 +1,166 @@
+<h3>Introduction</h3>
+This guide is for you if you face one of the following challenges:
+<ul>
+ 	<li>You might want to allow users to authenticate with OAuth/OpenID Connect and you also want to allow some "technical user" (such as another service) to access your data. That technical user might not get its JSON Web Token (JWT) signed by your central Identity Provider, but could use some other form of authentication.</li>
+ 	<li>You might also want to migrate from some sort of custom authentication mechanism to the more established and standardized OAuth/OpenID Connect, but you don't want to make the switch in one large "big bang" and risk locking out some users that haven't yet registered with the Identity Provider and still use the old way.</li>
+</ul>
+In both cases you need to support different JWTs in your application.
+
+<h3>Limitations</h3>
+We're going to use <b>Java 11</b> with <b>Spring Boot 2.2</b>. As <b>OpenID Connect</b> is the current gold standard for user authentication, we're also going to focus on that protocol.
+
+The goal of this blog post is to guide you in how to configure your Spring Boot Application to support a production-ready state-of-the-art authentication mechanism. I won't explain JSON Web Tokens (JWT), OAuth or OpenID Connect (OIDC) in detail here, but focus on the actual implementation. Some basic understanding of the Spring Framework can help following this guide.
+
+<h3>Standard Spring</h3>
+If you only need to support OpenID Connect from a single authorization server, you probably won't need this guide. Spring makes it easy as pie:
+In your <span style="color: #dd1144;">`application.yml`</span> you simply specify the issuer of your JWTs:
+<pre class="lang:yaml theme:github font:sourcecodepro decode:true" title="application.yml" br="">spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://idp.example.com/issuer
+</pre>
+That's it. Spring Boot will automatically pull the latest keys - in form of a JSON Web Key Set (<b>JWKS</b>) - from the authorization server to validate the signatures of incoming JWTs.
+
+<h3>Basics</h3>
+Spring Security reads the <strong>Authorization</strong> header of an incoming HTTP request to determine if a user has valid authentication.
+The value can either be <strong>"Basic"</strong>, followed by an encoded <i>`username:password`</i> value.
+In modern web applications however, transferring the user's credentials on each request is not feasible. You'll see the value <strong>"Bearer"</strong> in most cases. This indicates that the user is in possession of some sort of access token instead of a password. Those tokens are usually in the JWT (JSON Web Token) format.
+Spring passes the incoming request through a so called "filter chain" - which acts just like a water purification filter system (layered sand, gravel, charcoal, etc.).
+If any of the filters rejects the request for any reason, the chain is broken and the HTTP request is rejected in its entirety. We are going to focus on the <span style="color: #dd1144;">`BearerTokenAuthenticationFilter`</span> in this blog post.
+
+<h3>The Challenge</h3>
+Our filter chain is rightfully very strict about rejecting tokens (for example expired ones or incorrectly signed ones), so we might face the problem that our application does not know if a JWT is truly invalid or if it was just signed by another issuer (which we also want to support).
+So, how do we tell our application to accept multiple JWTs from different issuers while still rejecting invalid ones?
+We essentially have two options now:
+<ol>
+  <li>We introduce new endpoints and create a new <strong>Spring Security Filter Chain</strong> for each mechanism we want to support:
+    <ul>
+      <li>keep the existing endpoint and don't change any code: <code>/products/user?id=ad3f5-92feff-1a22ed3</code></li>
+      <li>add another endpoint and handle every request with a dedicated Filter Chain: <code><b>/oauth</b>/products/user?id=ad3f5-92feff-1a22ed3</code></li>
+      <li>you would have to do this for each way to authenticate: <code><b>/my-auth</b>/products/user?id=ad3f5-92feff-1a22ed3</code></li>
+    </ul>
+Oh, please don't forget to tell your "OAuth users" to use that new <b>/oauth</b> endpoint ...
+Or maybe you could place some gateway or proxy in between and do some rewrite magic ...
+But we don't want to manage double or even triple the endpoints and neither do we want to have more infrastructure and logic in between the application and the user, right?
+(The only advantage of this "breadth" approach is that you wouldn't need to change any of your existing authentication mechanism code.)
+We should rather choose the following option:</li>
+  <li>We can also enhance the logic of the current filters ("depth" approach) by adding different <span style="color: #dd1144;">`AuthenticationProvider`</span>s to the <span style="color: #dd1144;">`BearerTokenAuthenticationFilter`</span>. These providers can create <span style="color: #dd1144;">`Authentication`</span> objects for Spring's <span style="color: #dd1144;">`SecurityContext`</span>.</li>
+</ol>
+
+<h3>Let's Code!</h3>
+In the scope of this blog post, we're going to support 3 different ways to authenticate:
+<ol>
+ 	<li><b>Basic</b> authentication</li>
+ 	<li>OAuth access tokens (in form of JWTs), signed by a <b>standard OpenID Connect</b> (OIDC) authorization server</li>
+ 	<li>"Custom" JWTs signed with some <b>static secret</b> that is shared "out-of-band" with the other party</li>
+</ol>
+As Spring has a default <span style="color: #dd1144;">`AuthenticationProvider`</span> already built in for the standard OIDC protocol flow, we only need to implement a provider for our own statically signed JWTs. These JWTs should not have the header field <b>"kid"</b> - which would indicate a Key ID in a dynamic JSON Web Key Set (JWKS). Such dynamic sets of public keys that change over time are used in OpenID Connect.
+We check for the presence of this header field before trying to decode the JWT.
+<pre class="lang:java theme:github font:sourcecodepro decode:true" title="StaticJwtAuthenticationProvider.java">public class StaticJwtAuthenticationProvider implements AuthenticationProvider {
+
+  public JwtDecoder jwtDecoder() {
+    // initialize a decoder with a secret shared "out-of-band"
+    SecretKeySpec key = new SecretKeySpec("sup3r-s3cure_secRet".getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+    return NimbusJwtDecoder.withSecretKey(key).build();
+  }
+
+  @Override
+  public Authentication authenticate(Authentication authentication) throws AuthenticationException {
+    String kid = null;
+    try {
+      // "DecodedJWT" and "JWT" are from the "java-jwt" library by Auth0 and used for reading the JWT header
+      DecodedJWT jwt = JWT.decode(bearerToken.getToken());
+      kid = jwt.getKeyId();
+    } catch (JWTDecodeException exception) {
+      ...
+    }
+    if (kid == null) {
+      logger.info("JWT header does not contain a JWK Set Key ID. Must be a statically signed token.");
+      logger.info("Trying to authenticate ...");
+      Jwt jwt = jwtDecoder().decode(((BearerTokenAuthenticationToken) authentication).getToken());
+      // ...
+    } else {
+      return null;
+    }
+  }
+
+}
+</pre>
+In order for a Provider to successfully provide authentication to our app, we need to convert the incoming JWT to an <span style="color: #dd1144;">`Authentication`</span> object (such as an <span style="color: #dd1144;">`AbstractAuthenticationToken`</span>). We'll therefore implement a custom converter:
+<pre class="lang:java theme:github font:sourcecodepro decode:true" title="StaticJwtAuthenticationConverter.java">public class StaticJwtAuthenticationConverter implements Converter&lt;Jwt, AbstractAuthenticationToken&gt; {
+
+  private final MyUserDetailsService userDetailsService;
+
+  @Override
+  public AbstractAuthenticationToken convert(Jwt jwt) {
+    String username = jwt.getClaimAsString("sub"); // in this case the username is in the "sub" claim
+    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+    Collection authorities = extractAuthorities(jwt);
+    // ...
+    return new UsernamePasswordAuthenticationToken(userDetails.getUsername(), "n/a", authorities);
+  }
+
+}
+</pre>
+We also need to create a converter for our standard OpenID Connect access tokens:
+<pre class="lang:java theme:github font:sourcecodepro decode:true" title="OAuthJwtAuthenticationConverter.java">public class OAuthJwtAuthenticationConverter implements Converter&lt;Jwt, AbstractAuthenticationToken&gt; {
+
+  private final MyUserDetailsService userDetailsService;
+
+  @Override
+  public AbstractAuthenticationToken convert(Jwt jwt) {
+    String username = jwt.getClaimAsString("email"); // in this case we take the "email" claim as the username
+    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+    // ...
+    return new UsernamePasswordAuthenticationToken(userDetails.getUsername(), "n/a", authorities);
+  }
+}
+</pre>
+<blockquote><strong>Side note:</strong> It might make sense to make authentication converters more generic and create a <span style="color: #dd1144;">`public abstract class JwtAuthenticationConverter implements Converter&lt;Jwt, AbstractAuthenticationToken&gt;`</span> and let own converters extend that generic converter.</blockquote>
+Finally, we need to wire it all together in our <span style="color: #dd1144;">`WebSecurityConfiguration`</span>.
+<pre class="lang:java theme:github font:sourcecodepro decode:true" title="WebSecurityConfiguration.java">
+@Configuration
+@EnableWebSecurity
+public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
+
+  private final MyUserDetailsService myUserDetailsService;
+
+  @Override
+    protected void configure(HttpSecurity http) throws Exception {
+      http
+        .authorizeRequests()
+        .antMatchers("/health").permitAll()
+        .anyRequest().authenticated().and()
+        // ...
+        .oauth2ResourceServer().jwt()
+        .jwtAuthenticationConverter(oAuthJwtAuthenticationConverter());
+  }
+
+  @Bean
+  OAuthJwtAuthenticationConverter oAuthJwtAuthenticationConverter() {
+      return new OAuthJwtAuthenticationConverter(myUserDetailsService);
+  }
+
+  @Bean
+  StaticJwtAuthenticationProvider staticJwtAuthenticationProvider() {
+      return new StaticJwtAuthenticationProvider(new StaticJwtAuthenticationConverter(myUserDetailsService));
+  }
+
+  @Override
+  protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+      auth.authenticationProvider(staticJwtAuthenticationProvider());
+      auth.userDetailsService(myUserDetailsService);
+      // add Basic auth here ...
+  }
+}
+</pre>
+Phew, that's it! Your application should now be ready to correctly authenticate users that use different kinds of JWTs.
+<blockquote><b><span style="color: #dd1144;">IMPORTANT: As this code is crucial for the security of your application, you should always run automated tests! You should test valid authentication, but you also need to assure that invalid or expired tokens are correctly rejected.</span></b></blockquote>
+
+You can find all the code on GitHub: <a href="https://github.com/daniel-mader/blog-post-spring-multi-jwt" target="_blank" rel="noopener noreferrer">https://github.com/daniel-mader/blog-post-spring-multi-jwt</a>
+
+<h3>Multi-tenancy support</h3>
+With the <a href="https://docs.spring.io/spring-security/site/docs/5.2.0.RELEASE/reference/htmlsingle/#new" target="_blank" rel="noopener noreferrer">release of Spring Security 5.2.0</a>, multi-tenancy support was introduced which drastically eases setting up multiple token issuers. You can read about it in the <a href="https://docs.spring.io/spring-security/site/docs/current/reference/html5/#oauth2resourceserver-multitenancy" target="_blank" rel="noopener noreferrer">official docs</a>.
+Implementing multi-tenancy support might be subject of a follow-up blog post.
