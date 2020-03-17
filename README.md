@@ -1,7 +1,10 @@
 # Supporting different JWTs in your Spring Boot application
-In some of your services you might want to allow your users to use different ways to authenticate.
+Link to blog post: https://www.novatec-gmbh.de/en/blog/supporting-different-jwts-in-your-spring-boot-application
+
+---
+**In some of your services you might want to allow your users to use different ways to authenticate.
 This guide is for you if you want to support multiple JWTs signed by different issuers (in most cases authorization servers).
-I'll explain how to configure Spring to provide a production-ready solution - of course with code examples.
+I'll explain how to configure Spring to provide a production-ready solution - of course with code examples.**
 
 ### Introduction
 This guide is for you if you face one of the following challenges:
