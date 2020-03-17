@@ -11,4 +11,4 @@ pluginManagement {
 		}
 	}
 }
-rootProject.name = 'blog-post-demo-code'
+rootProject.name = 'blog-post-spring-multi-jwt'

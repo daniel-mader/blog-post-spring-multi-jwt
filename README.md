@@ -177,3 +177,9 @@ You can find all the code on GitHub: https://github.com/daniel-mader/blog-post-s
 ### Multi-tenancy support
 With the [release of Spring Security 5.2.0](https://docs.spring.io/spring-security/site/docs/5.2.0.RELEASE/reference/htmlsingle/#new), multi-tenancy support was introduced which drastically eases setting up multiple token issuers. You can read about it in the [official docs](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#oauth2resourceserver-multitenancy).
 Implementing multi-tenancy support might be subject of a follow-up blog post.
+
+---
+#### Running the tests
+* install Docker
+* run the tests with `./gradlew cleanTest test`
+* this can take a while on first run (Docker images need to be pulled)
