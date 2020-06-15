@@ -15,7 +15,7 @@ static-jwt:
   valid-token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGF0aWNVc2VyIiwiaXNzIjoiaHR0cHM6Ly9zdGF0aWMudG9rZW4uZ2VuZXJhdG9yLmxvY2FsIiwiZXhwIjoxODk5MTk4Nzc4fQ.dh8nhRNUrzIiflhZcUROai412gUAK1v5JkbOYEzHPhg"
   expired-token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzdGF0aWNVc2VyIiwiaXNzIjoiaHR0cHM6Ly9zdGF0aWMudG9rZW4uZ2VuZXJhdG9yLmxvY2FsIiwiZXhwIjoxNTgzODM4OTI5fQ.2PcSvaqJnaHd0IXwPv0ZDOm05DxDc_oYH3S9YYUFAtI"
 
-basicAuth: "YmFzaWNVc2VyOnBhc3N3b3Jk"
+basicAuth: "YmFzaWNVc2VyOnBAc3N3MHJk"
 
 keycloak-docker-image:
   image: "quay.io/keycloak/keycloak"

@@ -55,7 +55,7 @@ public class StaticJwtAuthenticationProvider implements AuthenticationProvider {
             logger.info(exception.getMessage());
         }
         if (kid == null) {
-            logger.info("JWT header does not contain a key ID / JWK Set URL. Must be a static token.");
+            logger.info("JWT header does not contain a key ID / JWK Set URL. Provided token must be a static token.");
             logger.info("Trying to authenticate ...");
 
             BearerTokenAuthenticationToken bearer = (BearerTokenAuthenticationToken) authentication;
@@ -64,10 +64,11 @@ public class StaticJwtAuthenticationProvider implements AuthenticationProvider {
                 jwt = jwtDecoder().decode(bearer.getToken());
             } catch (JwtException failed) {
                 OAuth2Error invalidToken = invalidToken(failed.getMessage());
+                logger.info(invalidToken.getDescription());
                 throw new OAuth2AuthenticationException(invalidToken, invalidToken.getDescription(), failed);
             }
             AbstractAuthenticationToken token = this.converter.convert(jwt);
-            logger.info("Successfully authenticated user with static legacy token. (principal: {})", token.getPrincipal());
+            logger.info("Successfully authenticated user with static token. (principal: {})", token.getPrincipal());
             return token;
         } else {
             logger.info("JWT header contains a key ID. Skipping static jwt verification ...");

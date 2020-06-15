@@ -10,5 +10,5 @@ spring:
           issuer-uri: https://dev-308298.okta.com
 
 static-jwt:
-  hmacsecret: "some-256-bit-secret"
+  hmacsecret: "some-super-random-256-bit-secret"
   issuer: "https://static.token.generator.local"
