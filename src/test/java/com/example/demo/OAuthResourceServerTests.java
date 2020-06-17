@@ -66,7 +66,7 @@ public class OAuthResourceServerTests {
 
         var users = keycloakAdminClient.realm("master").users().list();
         assertThat(users).isNotEmpty();
-        assertThat(serverInfo.getSystemInfo().getVersion()).isEqualTo("9.0.0"); // TODO: read from properties
+        assertThat(serverInfo.getSystemInfo().getVersion()).isEqualTo("10.0.2"); // TODO: read from properties
     }
 
     @Test

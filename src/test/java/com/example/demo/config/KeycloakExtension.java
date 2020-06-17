@@ -23,7 +23,7 @@ public class KeycloakExtension implements BeforeAllCallback, ParameterResolver {
     public void beforeAll(ExtensionContext context) {
         // TODO: read from application-test.yml
         this.keycloakDockerImage = "quay.io/keycloak/keycloak";
-        this.keycloakDockerVersion = "9.0.0";
+        this.keycloakDockerVersion = "10.0.2";
 
         String keycloakDockerImageName = keycloakDockerImage + ":" + keycloakDockerVersion;
         logger.info("Keycloak Docker Image: {}", keycloakDockerImageName);
