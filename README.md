@@ -1,4 +1,7 @@
 # How to support different JWTs in your Spring Boot application
+
+![Java CI with Gradle](https://github.com/daniel-mader/blog-post-spring-multi-jwt/workflows/Java%20CI%20with%20Gradle/badge.svg)
+
 **In some of your services you might want to allow your users to use different ways to authenticate.
 This guide is for you if you want to support multiple JWTs signed by different issuers (in most cases authorization servers).
 I'll explain how to configure Spring Boot to provide a production-ready solution - of course with code examples.**
