@@ -1,26 +1,30 @@
-# Supporting different JWTs in your Spring Boot application
-Link to blog post: https://www.novatec-gmbh.de/en/blog/supporting-different-jwts-in-your-spring-boot-application
+# How to support different JWTs in your Spring Boot application
+Link to blog post: https://www.novatec-gmbh.de/en/blog/how-to-support-different-jwts-in-your-spring-boot-application
 
 ---
-**In some of your services you might want to allow your users to use different ways to authenticate.
+**In some of your services you might want to allow your users to use multiple ways to authenticate.
 This guide is for you if you want to support multiple JWTs signed by different issuers (in most cases authorization servers).
-I'll explain how to configure Spring to provide a production-ready solution - of course with code examples.**
+I'll explain how to configure Spring Boot to provide a production-ready solution - of course with code examples.**
 
 ### Introduction
 This guide is for you if you face one of the following challenges:
-* You might want to allow users to authenticate with OAuth/OpenID Connect and you also want to allow some "technical user" (such as another service) to access your data. That technical user might not get its JSON Web Token (JWT) signed by your central Identity Provider, but could use some other form of authentication.
-* You might also want to migrate from some sort of custom authentication mechanism to the more established and standardized OAuth/OpenID Connect, but you don't want to make the switch in one large "big bang" and risk locking out some users that haven't yet registered with the Identity Provider and still use the old way.
+* Maybe you want to allow users to authenticate with OAuth/OpenID Connect, but you also want to allow some "technical user" (such as another service) to access your data. That technical user might not get its JSON Web Token (JWT) signed by your central Identity Provider, but could use some other form of authentication.
+* You might also want to migrate from some sort of custom authentication mechanism to the more established and standardized OAuth/OpenID Connect, but you don’t want to make the switch in one large "big bang" and risk locking out some users that haven't yet registered with the Identity Provider and still use the old way.
 
 In both cases you need to support different JWTs in your application.
 
-### Limitations
-We're going to use **Java 11** with **Spring Boot 2.2**. As **OpenID Connect** is the current gold standard for user authentication, we're also going to focus on that protocol.
+### Delimitations
+We're going to use **Java 11** with **Spring Boot 2.3**. As **OpenID Connect** is the current gold standard for user authentication, we're also going to focus on that protocol.
 
-The goal of this blog post is to guide you in how to configure your Spring Boot Application to support a production-ready state-of-the-art authentication mechanism. I won't explain JSON Web Tokens (JWT), OAuth or OpenID Connect (OIDC) in detail here, but focus on the actual implementation. Some basic understanding of the Spring Framework can help following this guide.
+The goal of this blog post is to guide you in how to configure your Spring Boot Application to support a production-ready state-of-the-art authentication mechanism.
+I won't explain JSON Web Tokens (JWT), OAuth or OpenID Connect (OIDC) in detail here, but focus on the actual implementation.
+If you want to learn more about Identity Federation in general, check out the [blog post by Dorian](https://www.novatec-gmbh.de/en/blog/identity-federation-more-than-connecting-to-facebook).
+Some basic understanding of Spring Boot can help following this guide.
 
-### Standard Spring
-If you only need to support OpenID Connect from a single authorization server, you probably won't need this guide. Spring makes it easy as pie:
-In your `application.yml` you simply specify the issuer of your JWTs:
+### Default Spring Boot
+If you only need to support OpenID Connect from a single authorization server, you probably won't need this guide.
+Spring Boot makes it easy as pie. First, add the Spring Security framework [to your dependencies](https://spring.io/guides/gs/securing-web).
+Then, simply specify the issuer of your JWTs in your **application.yml**:
 ```yml
 spring:
   security:
@@ -31,15 +35,19 @@ spring:
 ```
 That's it. Spring Boot will automatically pull the latest keys - in form of a JSON Web Key Set (**JWKS**) - from the authorization server to validate the signatures of incoming JWTs.
 
-### Basics
+### How Spring Security handles authentication
 Spring Security reads the **Authorization** header of an incoming HTTP request to determine if a user has valid authentication.
 The value can either be **"Basic"**, followed by an encoded _`username:password`_ value.
-In modern web applications however, transferring the user's credentials on each request is not feasible. You'll see the value **"Bearer"** in most cases. This indicates that the user is in possession of some sort of access token instead of a password. Those tokens are usually in the JWT (JSON Web Token) format.
-Spring passes the incoming request through a so called "filter chain" - which acts just like a water purification filter system (layered sand, gravel, charcoal, etc.).
-If any of the filters rejects the request for any reason, the chain is broken and the HTTP request is rejected in its entirety. We are going to focus on the `BearerTokenAuthenticationFilter` in this blog post.
+In modern web applications however, transferring the user's credentials on each request is not feasible. You'll see the value **"Bearer"** in most cases.
+This indicates that the user is in possession of some sort of access token instead of a password. Those tokens are usually in the JWT (JSON Web Token) format.
+Spring Security passes the incoming request through a so called "filter chain" - which acts just like a water purification filter system (layered sand, gravel, charcoal, etc.).
+If any of the filters rejects the request for any reason, the chain is broken and the HTTP request is rejected in its entirety.
+We are going to focus on the `BearerTokenAuthenticationFilter` in this blog post.
+(Read more about Spring Security’s architecture [here](https://spring.io/guides/topicals/spring-security-architecture).)
 
 ### The Challenge
-Our filter chain is rightfully very strict about rejecting tokens (for example expired ones or incorrectly signed ones), so we might face the problem that our application does not know if a JWT is truly invalid or if it was just signed by another issuer (which we also want to support).
+Our filter chain is rightfully very strict about rejecting tokens (for example expired ones or incorrectly signed ones),
+so we might face the problem that our application does not know if a JWT is truly invalid or if it was just signed by another issuer (which we also want to support).
 So, how do we tell our application to accept multiple JWTs from different issuers while still rejecting invalid ones?
 We essentially have two options now:
 
@@ -65,7 +73,9 @@ In the scope of this blog post, we're going to support 3 different ways to authe
 2. OAuth access tokens (in form of JWTs), signed by a **standard OpenID Connect** (OIDC) authorization server
 3. "Custom" JWTs signed with some **static secret** that is shared "out-of-band" with the other party
 
-As Spring has a default `AuthenticationProvider` already built in for the standard OIDC protocol flow, we only need to implement a provider for our own statically signed JWTs. These JWTs should not have the header field **"kid"** - which would indicate a Key ID in a dynamic JSON Web Key Set (JWKS). Such dynamic sets of public keys that change over time are used in OpenID Connect.
+As Spring has a default `AuthenticationProvider` already built in for the standard OIDC protocol flow, we only need to implement a provider for our own statically signed JWTs.
+These JWTs should not have the header field **"kid"** - which would indicate a Key ID in a dynamic JSON Web Key Set (JWKS).
+Such dynamic sets of public keys that change over time are used in OpenID Connect.
 We check for the presence of this header field before trying to decode the JWT.
 
 ```java
@@ -99,7 +109,9 @@ public class StaticJwtAuthenticationProvider implements AuthenticationProvider {
 }
 ```
 
-In order for a Provider to successfully provide authentication to our app, we need to convert the incoming JWT to an `Authentication` object (such as an `AbstractAuthenticationToken`). We'll therefore implement a custom converter:
+In order for a Provider to successfully provide authentication to our app,
+we need to convert the incoming JWT to an `Authentication` object (such as an `AbstractAuthenticationToken`).
+We'll therefore implement a custom converter:
 ```java
 public class StaticJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
@@ -173,10 +185,16 @@ public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
 ```
 
 Phew, that's it! Your application should now be ready to correctly authenticate users that use different kinds of JWTs.
->**IMPORTANT: As this code is crucial for the security of your application, you should always run automated tests! You should test valid authentication, but you also need to assure that invalid or expired tokens are correctly rejected.**
+>**IMPORTANT: As this code is crucial for the security of your application, you should always run automated tests!
+>You should test valid authentication, but you also need to assure that invalid or expired tokens are correctly rejected.**
+
+If you need more assistance implementing OAuth/OpenID Connect or need advice on how this can be applied to your company,
+check [our offering here](https://www.novatec-gmbh.de/beratung/oauth-2-0-und-openid-connect).
 
 You can find all the code on GitHub: https://github.com/daniel-mader/blog-post-spring-multi-jwt
 
 ### Multi-tenancy support
-With the [release of Spring Security 5.2.0](https://docs.spring.io/spring-security/site/docs/5.2.0.RELEASE/reference/htmlsingle/#new), multi-tenancy support was introduced which drastically eases setting up multiple token issuers. You can read about it in the [official docs](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#oauth2resourceserver-multitenancy).
+With the [release of Spring Security 5.2.0](https://docs.spring.io/spring-security/site/docs/5.2.0.RELEASE/reference/htmlsingle/#new),
+multi-tenancy support was introduced which drastically eases setting up multiple token issuers.
+You can read about it in the [official docs](https://docs.spring.io/spring-security/site/docs/current/reference/html5/#oauth2resourceserver-multitenancy).
 Implementing multi-tenancy support might be subject of a follow-up blog post.
